@@ -7047,6 +7047,7 @@ GameObject:
   - component: {fileID: 1953800334}
   - component: {fileID: 1953800335}
   - component: {fileID: 1953800336}
+  - component: {fileID: 1953800337}
   m_Layer: 0
   m_Name: player
   m_TagString: Player
@@ -7116,19 +7117,22 @@ MonoBehaviour:
   jumpForce: 10
   jumpCooldown: 0.25
   airMultiplier: 0.4
-  crouchSpeed: 3.5
-  crouchYScale: 0.5
+  crouchSpeed: 5
+  crouchHeightMultiplier: 0.3
+  crouchDownForce: 5
   jumpKey: 32
   sprintKey: 304
-  CrouchKey: 306
-  playerHeight: 2
-  whatIsGround:
+  crouchKey: 306
+  groundLayer:
     serializedVersion: 2
     m_Bits: 1024
-  grounded: 0
+  groundCheckMargin: 0.5
   maxSlopeAngle: 40
+  slopeDownForce: 80
+  slopeCheckExtraDistance: 0.3
   orientation: {fileID: 1376787210}
-  state: 0
+  Grounded: 0
+  State: 0
 --- !u!114 &1953800336
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7142,22 +7146,47 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   orientation: {fileID: 1376787210}
-  rb: {fileID: 1953800334}
-  pm: {fileID: 1953800335}
-  whatIsWall:
+  rigidBody: {fileID: 1953800334}
+  playerMovement: {fileID: 1953800335}
+  wallLayer:
     serializedVersion: 2
     m_Bits: 2048
   climbSpeed: 7
   maxClimbTime: 10
+  climbKey: 119
   climbJumpUpForce: 14
   climbJumpBackForce: 12
   jumpKey: 32
-  climbJumps: 1
-  maxStickTime: 10
+  maxClimbJumps: 2
+  maxStickTime: 5
   detectionLength: 0.7
   sphereCastRadius: 0.25
   maxWallLookAngle: 45
   minWallNormalAngleChange: 5
+  CurrentState: 0
+--- !u!136 &1953800337
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1953800332}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 0.5
+  m_Height: 1
+  m_Direction: 1
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!4 &1972028470 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: f8e715a88acc4db4fbbf4e852da89d83, type: 3}
