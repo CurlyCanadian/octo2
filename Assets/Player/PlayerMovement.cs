@@ -97,7 +97,7 @@ public class PlayerMovement : MonoBehaviour {
     HandleInput();
     UpdateMovementState();
     
-    _rb.drag = Grounded ? _groundDrag : 0f;
+    _rb.linearDamping = Grounded ? _groundDrag : 0f;
   }
 
   private void FixedUpdate() {
@@ -170,7 +170,7 @@ public class PlayerMovement : MonoBehaviour {
       Vector3 slopeDirection = GetSlopeMoveDirection();
       _rb.AddForce(slopeDirection * _currentSpeed * MovementForceMultiplier, ForceMode.Force);
       
-      if (_rb.velocity.y > 0) {
+      if (_rb.linearVelocity.y > 0) {
         _rb.AddForce(Vector3.down * _slopeDownForce, ForceMode.Force);
       }
     } else if (Grounded) {
@@ -184,13 +184,13 @@ public class PlayerMovement : MonoBehaviour {
   }
 
   private void ClampSpeed() {
-    Vector3 currentVelocity = _rb.velocity;
+    Vector3 currentVelocity = _rb.linearVelocity;
     float horizontalSpeed = Mathf.Sqrt(currentVelocity.x * currentVelocity.x + 
         currentVelocity.z * currentVelocity.z);
     
     if (horizontalSpeed > _currentSpeed) {
       float scale = _currentSpeed / horizontalSpeed;
-      _rb.velocity = new Vector3(currentVelocity.x * scale, currentVelocity.y, 
+      _rb.linearVelocity = new Vector3(currentVelocity.x * scale, currentVelocity.y, 
           currentVelocity.z * scale);
     }
   }
@@ -198,9 +198,9 @@ public class PlayerMovement : MonoBehaviour {
   private void Jump() {
     _exitingSlope = true;
     
-    Vector3 velocity = _rb.velocity;
+    Vector3 velocity = _rb.linearVelocity;
     velocity.y = 0f;
-    _rb.velocity = velocity;
+    _rb.linearVelocity = velocity;
     
     _rb.AddForce(transform.up * _jumpForce, ForceMode.Impulse);
   }

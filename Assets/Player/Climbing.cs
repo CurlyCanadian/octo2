@@ -95,12 +95,12 @@ public class Climbing : MonoBehaviour
         bool newWall = frontWallHit.transform != lastWall ||
                        Mathf.Abs(Vector3.Angle(lastWallNormal, frontWallHit.normal)) > minWallNormalAngleChange;
 
-        if ((wallFront && newWall) || pm.grounded)
-        {
-            climbTimer = maxClimbTime;
-            climbJumpsLeft = climbJumps;
+        //if ((wallFront && newWall) || pm.grounded)
+        //{
+            //climbTimer = maxClimbTime;
+            //limbJumpsLeft = climbJumps;
 
-        }
+        //}
     }
 
     private void StartClimbing()
