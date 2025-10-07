@@ -136,11 +136,16 @@ public class PlayerMovement : MonoBehaviour {
     _rb.AddForce(Vector3.down * _crouchDownForce, ForceMode.Impulse);
   }
 
+  private bool HasHeadroomToStand() {
+    float standHalf = _standHeight * 0.5f;
+    float r = _collider.radius;
+    Vector3 bottom = transform.position + Vector3.up * (_standCenter.y - standHalf + r);
+    Vector3 top    = transform.position + Vector3.up * (_standCenter.y + standHalf - r);
+    return !Physics.CheckCapsule(bottom, top, r, _groundLayer, QueryTriggerInteraction.Ignore);
+  }
+
   private void TryStandUp() {
-    float standCheckDistance = _standHeight - _crouchHeight + 0.1f;
-    Vector3 checkPosition = transform.position + Vector3.up * (_crouchHeight * 0.5f);
-    
-    if (!Physics.Raycast(checkPosition, Vector3.up, standCheckDistance, _groundLayer)) {
+    if (HasHeadroomToStand()) {
       _isCrouching = false;
       _collider.height = _standHeight;
       _collider.center = _standCenter;
@@ -212,7 +217,9 @@ public class PlayerMovement : MonoBehaviour {
 
   private bool CheckIfOnSlope() {
     float checkDistance = (_collider.height * 0.5f) + 0.3f;
-    if (Physics.Raycast(transform.position, Vector3.down, out _slopeHit, checkDistance)) {
+    if (Physics.Raycast(
+          transform.position, Vector3.down, out _slopeHit, checkDistance,
+          _groundLayer, QueryTriggerInteraction.Ignore)) {
       float slopeAngle = Vector3.Angle(Vector3.up, _slopeHit.normal);
       return slopeAngle > MinSlopeAngle && slopeAngle < _maxSlopeAngle;
     }
