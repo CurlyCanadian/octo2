@@ -70,8 +70,8 @@ public class PlayerMovement : MonoBehaviour {
   public MovementState State;
 
   // Constants following Google style guide (PascalCase for public constants)
-  private const float kMovementForceMultiplier = 10f;
-  private const float kMinSlopeAngle = 0.1f;
+  private const float KMovementForceMultiplier = 10f;
+  private const float KMinSlopeAngle = 0.1f;
 
   // Private fields using camelCase
   private float currentSpeed;
@@ -240,15 +240,15 @@ public class PlayerMovement : MonoBehaviour {
 
     if (isOnSlope && !exitingSlope) {
       Vector3 slopeDirection = GetSlopeMoveDirection();
-      rigidBody.AddForce(slopeDirection * currentSpeed * kMovementForceMultiplier, ForceMode.Force);
+      rigidBody.AddForce(slopeDirection * currentSpeed * KMovementForceMultiplier, ForceMode.Force);
       
       if (rigidBody.linearVelocity.y > 0) {
         rigidBody.AddForce(Vector3.down * slopeDownForce, ForceMode.Force);
       }
     } else if (Grounded) {
-      rigidBody.AddForce(moveDirection * currentSpeed * kMovementForceMultiplier, ForceMode.Force);
+      rigidBody.AddForce(moveDirection * currentSpeed * KMovementForceMultiplier, ForceMode.Force);
     } else {
-      rigidBody.AddForce(moveDirection * currentSpeed * kMovementForceMultiplier * airMultiplier, 
+      rigidBody.AddForce(moveDirection * currentSpeed * KMovementForceMultiplier * airMultiplier, 
           ForceMode.Force);
     }
 
@@ -302,7 +302,7 @@ public class PlayerMovement : MonoBehaviour {
           transform.position, Vector3.down, out slopeHit, checkDistance,
           groundLayer, QueryTriggerInteraction.Ignore)) {
       float slopeAngle = Vector3.Angle(Vector3.up, slopeHit.normal);
-      return slopeAngle > kMinSlopeAngle && slopeAngle < maxSlopeAngle;
+      return slopeAngle > KMinSlopeAngle && slopeAngle < maxSlopeAngle;
     }
     return false;
   }

@@ -72,7 +72,7 @@ public class Climbing : MonoBehaviour {
   private Vector3 lastWallNormal;
   
   // Constants
-  private const float kClimbInputThreshold = 0.1f;
+  private const float KClimbInputThreshold = 0.1f;
 //beans
   /// <summary>
   /// Initializes climbing system and validates required references.
@@ -262,8 +262,8 @@ public class Climbing : MonoBehaviour {
 
     // Check for release conditions
     bool timerExpired = stickTimer <= 0f;
-    bool playerInputDetected = Mathf.Abs(Input.GetAxisRaw("Horizontal")) > kClimbInputThreshold ||
-                              Mathf.Abs(Input.GetAxisRaw("Vertical")) > kClimbInputThreshold;
+    bool playerInputDetected = Mathf.Abs(Input.GetAxisRaw("Horizontal")) > KClimbInputThreshold ||
+                              Mathf.Abs(Input.GetAxisRaw("Vertical")) > KClimbInputThreshold;
     bool jumpPressed = Input.GetKeyDown(jumpKey);
 
     if (timerExpired || playerInputDetected || jumpPressed) {
