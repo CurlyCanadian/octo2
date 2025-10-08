@@ -73,7 +73,7 @@ public class Climbing : MonoBehaviour {
   
   // Constants
   private const float kClimbInputThreshold = 0.1f;
-
+//beans
   /// <summary>
   /// Initializes climbing system and validates required references.
   /// </summary>
