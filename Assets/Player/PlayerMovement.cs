@@ -165,7 +165,8 @@ public class PlayerMovement : MonoBehaviour {
   /// Handles all input processing including jump and crouch actions.
   /// </summary>
   private void HandleInput() {
-    if (Input.GetKey(jumpKey) && readyToJump && Grounded) {
+    if (Input.GetKey(jumpKey) && readyToJump && Grounded)
+    {
       readyToJump = false;
       Jump();
       Invoke(nameof(ResetJump), jumpCooldown);
@@ -285,7 +286,8 @@ public class PlayerMovement : MonoBehaviour {
   /// <summary>
   /// Resets jump state after cooldown period. Called via Invoke.
   /// </summary>
-  private void ResetJump() {
+  private void ResetJump()
+  {
     readyToJump = true;
     exitingSlope = false;
   }

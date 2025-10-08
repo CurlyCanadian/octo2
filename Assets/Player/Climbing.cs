@@ -201,8 +201,10 @@ public class Climbing : MonoBehaviour {
   /// <summary>
   /// Handles climbing movement by setting upward velocity.
   /// </summary>
-  private void HandleClimbingMovement() {
-    if (CurrentState == ClimbingState.Climbing) {
+  private void HandleClimbingMovement()
+  {
+    if (CurrentState == ClimbingState.Climbing)
+    {
       Vector3 velocity = rigidBody.linearVelocity;
       velocity.y = climbSpeed;
       rigidBody.linearVelocity = velocity;
