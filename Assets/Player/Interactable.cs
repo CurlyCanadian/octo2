@@ -149,7 +149,6 @@ public class Interactable : MonoBehaviour
     private Vector3 currentInteractionPoint;
     private Vector3 currentInteractionNormal;
     private Rigidbody grabbedRigidbody;
-    private Joint grabJoint;
     private Material originalMaterial;
     private Renderer interactableRenderer;
     
@@ -412,26 +411,22 @@ public class Interactable : MonoBehaviour
 
     private void CreateGrabJoint()
     {
-        GameObject jointObject = new GameObject("GrabJoint");
-        jointObject.transform.position = currentInteractionPoint;
-        
-        grabJoint = jointObject.AddComponent<SpringJoint>();
-        grabJoint.connectedBody = grabbedRigidbody;
-        grabJoint.autoConfigureConnectedAnchor = false;
-        grabJoint.connectedAnchor = grabbedRigidbody.transform.InverseTransformPoint(currentInteractionPoint);
-        grabJoint.spring = grabForce;
-        grabJoint.damper = grabDamping;
-        grabJoint.maxDistance = 0.1f;
+        // Simple physics-based grab without joints
+        if (grabbedRigidbody != null) {
+            grabbedRigidbody.useGravity = false;
+            grabbedRigidbody.drag = grabDamping * 5f;
+        }
     }
 
     private void UpdateGrabbing()
     {
-        if (CurrentState == InteractionState.Dragging && grabJoint != null) {
-            grabJoint.transform.position = Vector3.Lerp(
-                grabJoint.transform.position,
-                grabPoint.position,
-                Time.deltaTime / KGrabSmoothTime
-            );
+        if (CurrentState == InteractionState.Dragging && grabbedRigidbody != null) {
+            // Move object toward grab point using physics forces
+            Vector3 targetPosition = grabPoint.position;
+            Vector3 direction = targetPosition - grabbedRigidbody.position;
+            
+            // Apply force to move object toward grab point
+            grabbedRigidbody.velocity = direction * grabForce;
 
             if (dragLineRenderer != null) {
                 dragLineRenderer.enabled = true;
@@ -455,9 +450,10 @@ public class Interactable : MonoBehaviour
 
     private void ReleaseGrabbedObject()
     {
-        if (grabJoint != null) {
-            DestroyImmediate(grabJoint.gameObject);
-            grabJoint = null;
+        // Re-enable gravity and reset drag when releasing
+        if (grabbedRigidbody != null) {
+            grabbedRigidbody.useGravity = true;
+            grabbedRigidbody.drag = 0f;
         }
         
         grabbedRigidbody = null;
