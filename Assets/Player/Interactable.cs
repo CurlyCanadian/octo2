@@ -414,7 +414,7 @@ public class Interactable : MonoBehaviour
         // Simple physics-based grab without joints
         if (grabbedRigidbody != null) {
             grabbedRigidbody.useGravity = false;
-            grabbedRigidbody.drag = grabDamping * 5f;
+            grabbedRigidbody.linearDamping = grabDamping * 5f;
         }
     }
 
@@ -426,7 +426,7 @@ public class Interactable : MonoBehaviour
             Vector3 direction = targetPosition - grabbedRigidbody.position;
             
             // Apply force to move object toward grab point
-            grabbedRigidbody.velocity = direction * grabForce;
+            grabbedRigidbody.linearVelocity = direction * grabForce;
 
             if (dragLineRenderer != null) {
                 dragLineRenderer.enabled = true;
@@ -453,7 +453,7 @@ public class Interactable : MonoBehaviour
         // Re-enable gravity and reset drag when releasing
         if (grabbedRigidbody != null) {
             grabbedRigidbody.useGravity = true;
-            grabbedRigidbody.drag = 0f;
+            grabbedRigidbody.linearDamping = 0f;
         }
         
         grabbedRigidbody = null;

@@ -13,10 +13,10 @@ TagManager:
   - UI
   - 
   - 
+  - interactable
   - 
-  - 
-  - whatIsGround
-  - whatIsWall
+  - ground
+  - wall
   - 
   - 
   - 
