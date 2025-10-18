@@ -11,7 +11,6 @@ using UnityEngine;
 // ├── Wall Layer: "Wall" :D
 
 // Interactable:
-// ├── Orientation: [Player's orientation transform]
 // ├── Player Movement: [PlayerMovement script]
 // ├── Climbing: [Climbing script]
 // ├── Player Camera: [Auto assigns to Main Camera]
