@@ -370,6 +370,7 @@ public class Interactable : MonoBehaviour
         if (CurrentState == InteractionState.Detected && hasValidInteractable) {
             if (Input.GetKeyDown(grabKey)) {
                 TryGrabObject();
+
             }
             
             if (Input.GetKeyDown(punchKey)) {

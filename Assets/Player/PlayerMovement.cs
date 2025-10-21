@@ -28,7 +28,7 @@ public class PlayerMovement : MonoBehaviour {
   [Header("Jumping")]
   [SerializeField] [Range(1f, 20f)] [Tooltip("Upward force applied on jump")]
   private float jumpForce = 10f;
-  [SerializeField] [Range(0.1f, 2f)] [Tooltip("Cooldown between jumps")]
+  [SerializeField] [Range(0f, 2f)] [Tooltip("Cooldown between jumps")]
   private float jumpCooldown = 0.25f;
   [SerializeField] [Range(0f, 1f)] [Tooltip("Movement force multiplier in air")]
   private float airMultiplier = 0.4f;
