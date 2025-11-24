@@ -1,5 +1,10 @@
 using UnityEngine;
 
+// renamed everthing to PhysicsObj instead
+// this will make it so the player can grab and move our "physicsObj" 
+// we can still have interactable buttons and animations
+// largely for cleanliness reasons
+
 // PlayerMovement:
 // ├── Orientation: [Player's orientation transform] :D
 // ├── Ground Layer: "Ground"
@@ -10,43 +15,44 @@ using UnityEngine;
 // ├── Player Movement: [PlayerMovement script]
 // ├── Wall Layer: "Wall" :D
 
-// Interactable:
+// PhysicsObj (this script):
+// ├── Orientation: [Player's orientation transform] :D
 // ├── Player Movement: [PlayerMovement script]
 // ├── Climbing: [Climbing script]
 // ├── Player Camera: [Auto assigns to Main Camera]
-// ├── Interactable Layer: "Interactable"
+// ├── PhysicsObj Layer: -Interactable- "PhysicsObj" 
+// it ONLY cares about rigidbody objects you can yeet
+
+// InteractionSelector (second script):
+// ├── Player Camera: [Auto assigns Main Camera]
+// ├── Interactable Layer: -Interactable- "Interactable" 
+// it ONLY cares about doors/buttons/animations/etc.
 
 
 // Layers
 // Edit > Project Settings > Tags and Layers :D
-// Create: Interactable, Wall and Ground layers
+// Create: -Interactable- PhysicsObj, Interactable, Wall and Ground layers
 // Layers^^^^^^^^^
+
 
 // errrrmmm if you cant grab objects then 
 // Ensure objects have Rigidbody
 // Check object mass < 2kg (default limit) google told me so :D
+// changed mass to < 4kg (played around with player weight)
 
 
 // make me this you foolish mortal peasent
 // Test Objects that I need make me them ^-^
 // Create a Cube
 // Add Rigidbody (Mass: 1.0)
-// Set Layer to "Interactable" 
-
-
-
-
-
-
-
-
+// Set Layer to "PhysicsObj" 
 
 
 
 // important!!!!!!!!!!!!!!!!!!!!!!! you must do this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 //  Things to verify in Unity Editor:
 
-// Layer Setup - Make sure you've created the (Interactable) layer in Unity (Edit > Project Settings > Tags and Layers)
+// Layer Setup - Make sure you've created the (PhysicsObj) layer in Unity (Edit > Project Settings > Tags and Layers)
 // References - Assign the required references in the Inspector:
 // Orientation (player's orientation transform)
 // PlayerMovement script
@@ -54,17 +60,17 @@ using UnityEngine;
 // Main Camera (auto assigns if not set)
 // Test Objects - Objects you want to interact with need:
 // Rigidbody component
-// Layer set to (Interactable"q
-// Mass ≤ 2kg (or adjust maxGrabMass in Inspector)
+// Layer set to (PhysicsObj)
+// Mass ≤ maxGrabMass (or adjust maxGrabMass in Inspector)
 // 🎮 Default Controls:
 
-// E - Grab Release objects
+// Left Click - Grab / Release objects (if enabled below)
 // F - Punch objects
 // Q - Throw grabbed objects
 
 
 [RequireComponent(typeof(Rigidbody))]
-public class Interactable : MonoBehaviour
+public class PhysicsObj : MonoBehaviour
 {
     public enum InteractionState
     {
@@ -92,7 +98,7 @@ public class Interactable : MonoBehaviour
     [SerializeField] private Transform grabPoint;
 
     [Header("Detection Settings")]
-    [SerializeField] private LayerMask interactableLayer = -1;
+    [SerializeField] private LayerMask physicsObjLayer = -1;
     [SerializeField] [Range(0.5f, 5f)] private float detectionDistance = 2f;
     [SerializeField] [Range(0.1f, 0.8f)] private float detectionRadius = 0.3f;
     [SerializeField] [Range(0f, 1.5f)] private float detectionHeightOffset = 0.8f;
@@ -111,13 +117,14 @@ public class Interactable : MonoBehaviour
     [SerializeField] [Range(0.1f, 0.5f)] private float punchDuration = 0.2f;
 
     [Header("Input Settings")]
-    [SerializeField] private KeyCode grabKey = KeyCode.E;
+    [SerializeField] private bool useLeftClickForGrab = true; // 👈 YOU WANT THIS TRUE
+    [SerializeField] private KeyCode grabKey = KeyCode.E;     // fallback if you turn mouse off
     [SerializeField] private KeyCode punchKey = KeyCode.F;
     [SerializeField] private KeyCode throwKey = KeyCode.Q;
 
     [Header("Physics Settings")]
-    [SerializeField] [Range(0f, 90f)] private float maxInteractionAngle = 60f;
-    [SerializeField] [Range(0.1f, 2f)] private float interactionCooldown = 0.3f;
+    [SerializeField] [Range(0f, 90f)] private float maxAngle = 60f;
+    [SerializeField] [Range(0.1f, 2f)] private float objCooldown = 0.3f;
     [SerializeField] [Range(0.1f, 1f)] private float minAirborneTime = 0.2f;
     [SerializeField] [Range(0.5f, 3f)] private float minimumObjectSize = 1f;
 
@@ -144,62 +151,65 @@ public class Interactable : MonoBehaviour
     private float detectionStabilityTimer;
     private float punchTimer;
     private bool wasGroundedLastFrame;
-    private Transform currentInteractable;
+
+    private Transform currentPhysicsObj;
     private Vector3 currentInteractionPoint;
     private Vector3 currentInteractionNormal;
+
     private Rigidbody grabbedRigidbody;
     private Material originalMaterial;
-    private Renderer interactableRenderer;
-    
+    private Renderer physicsObjRenderer;
+
     private RaycastHit primaryHit;
-    private bool hasValidInteractable;
+    private bool hasValidPhysicsObj;
     private bool hasStableDetection;
     private bool isPunching;
-    
-    private const float KMinVelocityForInteraction = 0.5f;
+
     private const float KMaxDistanceFromHitPoint = 3f;
     private const float KDetectionStabilityTime = 0.1f;
-    private const float KGrabSmoothTime = 0.1f;
 
     private void Start()
     {
-        if (!ValidateReferences()) {
+        if (!ValidateReferences())
+        {
             enabled = false;
             return;
         }
 
         ResetInteractionState();
-        lastInteractionTime = -interactionCooldown;
-        
-        if (dragLineRenderer != null) {
+        lastInteractionTime = -objCooldown;
+
+        if (dragLineRenderer != null)
             dragLineRenderer.enabled = false;
-        }
     }
 
     private bool ValidateReferences()
     {
         bool isValid = true;
 
-        if (orientation == null) {
-            Debug.LogError("Interactable: Orientation reference is null!");
+        if (orientation == null)
+        {
+            Debug.LogError("PhysicsObj: Orientation reference is null!");
             isValid = false;
         }
 
-        if (playerMovement == null) {
-            Debug.LogError("Interactable: PlayerMovement reference is null!");
+        if (playerMovement == null)
+        {
+            Debug.LogError("PhysicsObj: PlayerMovement reference is null!");
             isValid = false;
         }
 
-        if (climbing == null) {
-            Debug.LogError("Interactable: Climbing reference is null!");
+        if (climbing == null)
+        {
+            Debug.LogError("PhysicsObj: Climbing reference is null!");
             isValid = false;
         }
 
-        if (playerCamera == null) {
+        if (playerCamera == null)
             playerCamera = Camera.main;
-        }
 
-        if (grabPoint == null) {
+        if (grabPoint == null && playerCamera != null)
+        {
             GameObject grabPointObj = new GameObject("GrabPoint");
             grabPointObj.transform.SetParent(playerCamera.transform);
             grabPointObj.transform.localPosition = Vector3.forward * grabDistance;
@@ -221,19 +231,27 @@ public class Interactable : MonoBehaviour
         UpdateDebugVisualization();
     }
 
+    // mouse vs key helpers so you don't rewrite input everywhere
+    private bool GrabPressedDown()
+        => useLeftClickForGrab ? Input.GetMouseButtonDown(0) : Input.GetKeyDown(grabKey);
+
+    private bool GrabReleased()
+        => useLeftClickForGrab ? Input.GetMouseButtonUp(0) : Input.GetKeyUp(grabKey);
+
     private void UpdateAirborneTracking()
     {
-        if (playerMovement.Grounded) {
-            if (!wasGroundedLastFrame) {
-                if (CurrentState == InteractionState.Dragging) {
-                    ReleaseGrabbedObject();
-                }
-            }
+        if (playerMovement.Grounded)
+        {
+            if (!wasGroundedLastFrame && CurrentState == InteractionState.Dragging)
+                ReleaseGrabbedObject();
+
             currentAirborneTime = 0f;
-        } else {
+        }
+        else
+        {
             currentAirborneTime += Time.deltaTime;
         }
-        
+
         wasGroundedLastFrame = playerMovement.Grounded;
     }
 
@@ -241,35 +259,42 @@ public class Interactable : MonoBehaviour
     {
         Vector3 detectionOrigin = GetDetectionOrigin();
         Vector3 detectionDirection = orientation.forward;
-        
+
         bool primaryDetection = Physics.SphereCast(
             detectionOrigin,
             detectionRadius,
             detectionDirection,
             out primaryHit,
             detectionDistance,
-            interactableLayer,
+            physicsObjLayer,
             QueryTriggerInteraction.Ignore
         );
 
-        if (primaryDetection && ValidateDetectedObject(primaryHit)) {
-            if (IsSameInteractable(primaryHit.transform)) {
+        if (primaryDetection && ValidateDetectedObject(primaryHit))
+        {
+            if (currentPhysicsObj == primaryHit.transform)
+            {
                 detectionStabilityTimer += Time.deltaTime;
                 hasStableDetection = detectionStabilityTimer >= KDetectionStabilityTime;
-            } else {
-                currentInteractable = primaryHit.transform;
+            }
+            else
+            {
+                currentPhysicsObj = primaryHit.transform;
                 detectionStabilityTimer = 0f;
                 hasStableDetection = false;
                 UpdateHighlight();
             }
 
-            if (hasStableDetection) {
+            if (hasStableDetection)
+            {
                 currentInteractionPoint = primaryHit.point;
                 currentInteractionNormal = primaryHit.normal;
-                hasValidInteractable = true;
+                hasValidPhysicsObj = true;
                 PlayDetectionFeedback();
             }
-        } else {
+        }
+        else
+        {
             ResetDetectionState();
         }
     }
@@ -282,111 +307,105 @@ public class Interactable : MonoBehaviour
 
     private bool ValidateDetectedObject(RaycastHit hit)
     {
-        if (Vector3.Distance(transform.position, hit.point) > KMaxDistanceFromHitPoint) {
+        if (Vector3.Distance(transform.position, hit.point) > KMaxDistanceFromHitPoint)
             return false;
-        }
 
         float angle = Vector3.Angle(orientation.forward, -hit.normal);
-        if (angle > maxInteractionAngle) {
+        if (angle > maxAngle)
             return false;
-        }
 
-        if (hit.collider != null) {
+        if (hit.collider != null)
+        {
             float objectSize = hit.collider.bounds.size.magnitude;
-            if (objectSize < minimumObjectSize) {
+            if (objectSize < minimumObjectSize)
                 return false;
-            }
         }
 
         return true;
     }
 
-    private bool IsSameInteractable(Transform detectedTransform)
-    {
-        return currentInteractable == detectedTransform;
-    }
-
     private void UpdateInteractionState()
     {
-        switch (CurrentState) {
+        switch (CurrentState)
+        {
             case InteractionState.None:
-                if (hasValidInteractable && CanStartInteraction()) {
+                if (hasValidPhysicsObj && CanStartInteraction())
                     CurrentState = InteractionState.Detected;
-                }
                 break;
 
             case InteractionState.Detected:
-                if (!hasValidInteractable) {
+                if (!hasValidPhysicsObj)
                     CurrentState = InteractionState.None;
-                }
                 break;
 
             case InteractionState.Grabbing:
-                if (grabbedRigidbody != null) {
+                if (grabbedRigidbody != null)
                     CurrentState = InteractionState.Dragging;
-                } else {
+                else
+                {
                     CurrentState = InteractionState.Cooldown;
                     lastInteractionTime = Time.time;
                 }
                 break;
 
             case InteractionState.Dragging:
-                if (grabbedRigidbody == null) {
+                if (grabbedRigidbody == null)
+                {
                     CurrentState = InteractionState.Cooldown;
                     lastInteractionTime = Time.time;
                 }
                 break;
 
             case InteractionState.Punching:
-                if (!isPunching) {
+                if (!isPunching)
+                {
                     CurrentState = InteractionState.Cooldown;
                     lastInteractionTime = Time.time;
                 }
                 break;
 
             case InteractionState.Cooldown:
-                if (Time.time - lastInteractionTime >= interactionCooldown) {
+                if (Time.time - lastInteractionTime >= objCooldown)
                     CurrentState = InteractionState.None;
-                }
                 break;
         }
     }
 
     private bool CanStartInteraction()
     {
-        if (Time.time - lastInteractionTime < interactionCooldown) {
-            return false;
-        }
-
-        if (CurrentState == InteractionState.Dragging || CurrentState == InteractionState.Punching) {
-            return false;
-        }
-
+        if (Time.time - lastInteractionTime < objCooldown) return false;
+        if (CurrentState == InteractionState.Dragging || CurrentState == InteractionState.Punching) return false;
         return true;
     }
 
     private void HandleInput()
     {
-        if (CurrentState == InteractionState.Detected && hasValidInteractable) {
-            if (Input.GetKeyDown(grabKey)) {
+        if (CurrentState == InteractionState.Detected && hasValidPhysicsObj)
+        {
+            if (GrabPressedDown())
                 TryGrabObject();
 
-            }
-            
-            if (Input.GetKeyDown(punchKey)) {
+            if (Input.GetKeyDown(punchKey))
                 TryPunchObject();
-            }
         }
 
-        if (CurrentState == InteractionState.Dragging) {
-            if (Input.GetKeyDown(throwKey) || Input.GetKeyUp(grabKey)) {
+        if (CurrentState == InteractionState.Dragging)
+        {
+            if (Input.GetKeyDown(throwKey))
+            {
                 ThrowObject();
             }
+            else if (GrabReleased())
+            {
+                // release grab = DROP (not throw)
+                ReleaseGrabbedObject();
+                CurrentState = InteractionState.Cooldown;
+                lastInteractionTime = Time.time;
+            }
         }
 
-        if (!playerMovement.Grounded && hasValidInteractable && currentAirborneTime > minAirborneTime) {
+        if (!playerMovement.Grounded && hasValidPhysicsObj && currentAirborneTime > minAirborneTime)
             TriggerClimbInteraction();
-        }
     }
 
     private void TryGrabObject()
@@ -395,9 +414,10 @@ public class Interactable : MonoBehaviour
 
         CurrentState = InteractionState.Grabbing;
         LastInteractionType = InteractionType.Grab;
-        
-        grabbedRigidbody = currentInteractable.GetComponent<Rigidbody>();
-        if (grabbedRigidbody != null) {
+
+        grabbedRigidbody = currentPhysicsObj.GetComponent<Rigidbody>();
+        if (grabbedRigidbody != null)
+        {
             CreateGrabJoint();
             PlaySound(grabSound);
         }
@@ -405,14 +425,16 @@ public class Interactable : MonoBehaviour
 
     private bool CanGrabObject()
     {
-        Rigidbody rb = currentInteractable.GetComponent<Rigidbody>();
-        return rb != null && rb.mass <= maxGrabMass && Vector3.Distance(transform.position, currentInteractable.position) <= grabDistance;
+        Rigidbody rb = currentPhysicsObj.GetComponent<Rigidbody>();
+        return rb != null &&
+               rb.mass <= maxGrabMass &&
+               Vector3.Distance(transform.position, currentPhysicsObj.position) <= grabDistance;
     }
 
     private void CreateGrabJoint()
     {
-        // Simple physics-based grab without joints
-        if (grabbedRigidbody != null) {
+        if (grabbedRigidbody != null)
+        {
             grabbedRigidbody.useGravity = false;
             grabbedRigidbody.linearDamping = grabDamping * 5f;
         }
@@ -420,15 +442,14 @@ public class Interactable : MonoBehaviour
 
     private void UpdateGrabbing()
     {
-        if (CurrentState == InteractionState.Dragging && grabbedRigidbody != null) {
-            // Move object toward grab point using physics forces
+        if (CurrentState == InteractionState.Dragging && grabbedRigidbody != null)
+        {
             Vector3 targetPosition = grabPoint.position;
             Vector3 direction = targetPosition - grabbedRigidbody.position;
-            
-            // Apply force to move object toward grab point
             grabbedRigidbody.linearVelocity = direction * grabForce;
 
-            if (dragLineRenderer != null) {
+            if (dragLineRenderer != null)
+            {
                 dragLineRenderer.enabled = true;
                 dragLineRenderer.SetPosition(0, grabPoint.position);
                 dragLineRenderer.SetPosition(1, grabbedRigidbody.transform.position);
@@ -438,43 +459,44 @@ public class Interactable : MonoBehaviour
 
     private void ThrowObject()
     {
-        if (grabbedRigidbody != null) {
+        if (grabbedRigidbody != null)
+        {
             Vector3 throwDirection = playerCamera.transform.forward;
             grabbedRigidbody.AddForce(throwDirection * throwForce, ForceMode.VelocityChange);
             PlaySound(throwSound);
             LastInteractionType = InteractionType.Throw;
         }
-        
+
         ReleaseGrabbedObject();
     }
 
     private void ReleaseGrabbedObject()
     {
-        // Re-enable gravity and reset drag when releasing
-        if (grabbedRigidbody != null) {
+        if (grabbedRigidbody != null)
+        {
             grabbedRigidbody.useGravity = true;
             grabbedRigidbody.linearDamping = 0f;
         }
-        
+
         grabbedRigidbody = null;
-        
-        if (dragLineRenderer != null) {
+
+        if (dragLineRenderer != null)
             dragLineRenderer.enabled = false;
-        }
     }
 
     private void TryPunchObject()
     {
-        if (Vector3.Distance(transform.position, currentInteractable.position) > punchRange) return;
+        if (Vector3.Distance(transform.position, currentPhysicsObj.position) > punchRange) return;
 
         CurrentState = InteractionState.Punching;
         LastInteractionType = InteractionType.Punch;
         isPunching = true;
         punchTimer = punchDuration;
 
-        Rigidbody targetRb = currentInteractable.GetComponent<Rigidbody>();
-        if (targetRb != null) {
-            Vector3 punchDirection = (currentInteractable.position - transform.position).normalized;
+        Rigidbody targetRb = currentPhysicsObj.GetComponent<Rigidbody>();
+        if (targetRb != null)
+        {
+            Vector3 punchDirection = (currentPhysicsObj.position - transform.position).normalized;
             targetRb.AddForce(punchDirection * punchForce, ForceMode.Impulse);
         }
 
@@ -484,18 +506,22 @@ public class Interactable : MonoBehaviour
 
     private void UpdatePunching()
     {
-        if (isPunching) {
-            punchTimer -= Time.deltaTime;
-            if (punchTimer <= 0) {
-                isPunching = false;
-            }
-        }
+        if (!isPunching) return;
+
+        punchTimer -= Time.deltaTime;
+        if (punchTimer <= 0)
+            isPunching = false;
     }
 
     private void ShowPunchEffect()
     {
-        if (punchEffect != null) {
-            GameObject effect = Instantiate(punchEffect, currentInteractionPoint, Quaternion.LookRotation(currentInteractionNormal));
+        if (punchEffect != null)
+        {
+            GameObject effect = Instantiate(
+                punchEffect,
+                currentInteractionPoint,
+                Quaternion.LookRotation(currentInteractionNormal)
+            );
             Destroy(effect, 1f);
         }
     }
@@ -503,45 +529,45 @@ public class Interactable : MonoBehaviour
     private void TriggerClimbInteraction()
     {
         LastInteractionType = InteractionType.Climb;
-        Debug.Log($"Attempting to climb {currentInteractable.name}");
+        Debug.Log($"PhysicsObj: Attempting to climb {currentPhysicsObj.name}");
     }
 
     private void UpdateHighlight()
     {
-        if (interactableRenderer != null && originalMaterial != null) {
-            interactableRenderer.material = originalMaterial;
-        }
+        if (physicsObjRenderer != null && originalMaterial != null)
+            physicsObjRenderer.material = originalMaterial;
 
-        if (currentInteractable != null) {
-            interactableRenderer = currentInteractable.GetComponent<Renderer>();
-            if (interactableRenderer != null && highlightMaterial != null) {
-                originalMaterial = interactableRenderer.material;
-                interactableRenderer.material = highlightMaterial;
+        if (currentPhysicsObj != null)
+        {
+            physicsObjRenderer = currentPhysicsObj.GetComponent<Renderer>();
+            if (physicsObjRenderer != null && highlightMaterial != null)
+            {
+                originalMaterial = physicsObjRenderer.material;
+                physicsObjRenderer.material = highlightMaterial;
             }
         }
     }
 
     private void UpdateVisualFeedback()
     {
-        if (CurrentState != InteractionState.Detected && interactableRenderer != null && originalMaterial != null) {
-            interactableRenderer.material = originalMaterial;
-            interactableRenderer = null;
+        if (CurrentState != InteractionState.Detected && physicsObjRenderer != null && originalMaterial != null)
+        {
+            physicsObjRenderer.material = originalMaterial;
+            physicsObjRenderer = null;
             originalMaterial = null;
         }
     }
 
     private void PlaySound(AudioClip clip)
     {
-        if (audioSource != null && clip != null) {
+        if (audioSource != null && clip != null)
             audioSource.PlayOneShot(clip);
-        }
     }
 
     private void PlayDetectionFeedback()
     {
-        if (CurrentState == InteractionState.None) {
+        if (CurrentState == InteractionState.None)
             PlaySound(detectionSound);
-        }
     }
 
     private void ResetInteractionState()
@@ -553,23 +579,24 @@ public class Interactable : MonoBehaviour
 
     private void ResetDetectionState()
     {
-        hasValidInteractable = false;
+        hasValidPhysicsObj = false;
         hasStableDetection = false;
         detectionStabilityTimer = 0f;
-        currentInteractable = null;
+        currentPhysicsObj = null;
         currentInteractionPoint = Vector3.zero;
         currentInteractionNormal = Vector3.up;
     }
 
     private void UpdateDebugVisualization()
     {
-        if (!showDebugRays) return;
+        if (!showDebugRays || orientation == null) return;
 
         Vector3 origin = GetDetectionOrigin();
         Vector3 direction = orientation.forward * detectionDistance;
-        
-        Color rayColor = CurrentState switch {
-            InteractionState.None => hasValidInteractable ? Color.yellow : Color.red,
+
+        Color rayColor = CurrentState switch
+        {
+            InteractionState.None => hasValidPhysicsObj ? Color.yellow : Color.red,
             InteractionState.Detected => Color.green,
             InteractionState.Grabbing => Color.blue,
             InteractionState.Dragging => Color.cyan,
@@ -579,8 +606,9 @@ public class Interactable : MonoBehaviour
         };
 
         Debug.DrawRay(origin, direction, rayColor);
-        
-        if (hasValidInteractable) {
+
+        if (hasValidPhysicsObj)
+        {
             Debug.DrawLine(origin, currentInteractionPoint, Color.magenta);
             Debug.DrawRay(currentInteractionPoint, currentInteractionNormal * 0.5f, Color.blue);
         }
@@ -588,17 +616,18 @@ public class Interactable : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        if (!showDebugGizmos) return;
+        if (!showDebugGizmos || orientation == null) return;
 
         Vector3 origin = GetDetectionOrigin();
         Vector3 endPoint = origin + orientation.forward * detectionDistance;
 
-        Gizmos.color = hasValidInteractable ? Color.green : Color.red;
+        Gizmos.color = hasValidPhysicsObj ? Color.green : Color.red;
         Gizmos.DrawWireSphere(origin, detectionRadius);
         Gizmos.DrawWireSphere(endPoint, detectionRadius);
         Gizmos.DrawLine(origin, endPoint);
 
-        if (hasValidInteractable) {
+        if (hasValidPhysicsObj)
+        {
             Gizmos.color = Color.blue;
             Gizmos.DrawSphere(currentInteractionPoint, 0.1f);
             Gizmos.DrawRay(currentInteractionPoint, currentInteractionNormal * 0.5f);
@@ -607,22 +636,7 @@ public class Interactable : MonoBehaviour
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, grabDistance);
         Gizmos.DrawWireSphere(transform.position, punchRange);
-
-        Gizmos.color = CurrentState switch {
-            InteractionState.None => Color.gray,
-            InteractionState.Detected => Color.yellow,
-            InteractionState.Grabbing => Color.blue,
-            InteractionState.Dragging => Color.cyan,
-            InteractionState.Punching => Color.red,
-            InteractionState.Cooldown => Color.white,
-            _ => Color.black
-        };
-        
-        Gizmos.DrawWireCube(transform.position + Vector3.up * 2f, Vector3.one * 0.2f);
     }
 
-    private void OnDestroy()
-    {
-        ReleaseGrabbedObject();
-    }
+    private void OnDestroy() => ReleaseGrabbedObject();
 }

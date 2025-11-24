@@ -13,7 +13,7 @@ TagManager:
   - UI
   - 
   - 
-  - interactable
+  - PhysicsObj
   - 
   - ground
   - wall
