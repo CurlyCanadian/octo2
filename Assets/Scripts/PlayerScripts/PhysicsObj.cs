@@ -1,9 +1,11 @@
 using UnityEngine;
 
-// renamed everthing to PhysicsObj instead
+
+// TODO rename everthing to PhysicsObj instead
 // this will make it so the player can grab and move our "physicsObj" 
 // we can still have interactable buttons and animations
 // largely for cleanliness reasons
+
 
 // PlayerMovement:
 // ├── Orientation: [Player's orientation transform] :D
@@ -95,13 +97,18 @@ public class PhysicsObj : MonoBehaviour
     [SerializeField] private PlayerMovement playerMovement;
     [SerializeField] private Climbing climbing;
     [SerializeField] private Camera playerCamera;
-    [SerializeField] private Transform grabPoint;
 
     [Header("Detection Settings")]
     [SerializeField] private LayerMask physicsObjLayer = -1;
     [SerializeField] [Range(0.5f, 5f)] private float detectionDistance = 2f;
     [SerializeField] [Range(0.1f, 0.8f)] private float detectionRadius = 0.3f;
-    [SerializeField] [Range(0f, 1.5f)] private float detectionHeightOffset = 0.8f;
+    [SerializeField] [Range(0f, 1.5f)] private float detectionHeightOffset = 0.8f; 
+    // fallback only if camera missing
+
+    [Header("Aim / Crosshair Offset")]
+    // Viewport coords: (0.5,0.5) is screen center.
+    // Negative Y aims LOWER, positive Y aims HIGHER.
+    [SerializeField] private Vector2 aimViewportOffset = Vector2.zero;
 
     [Header("Grab & Drag Settings")]
     [SerializeField] [Range(0.5f, 3f)] private float grabDistance = 1.5f;
@@ -117,7 +124,7 @@ public class PhysicsObj : MonoBehaviour
     [SerializeField] [Range(0.1f, 0.5f)] private float punchDuration = 0.2f;
 
     [Header("Input Settings")]
-    [SerializeField] private bool useLeftClickForGrab = true; // 👈 YOU WANT THIS TRUE
+    [SerializeField] private bool useLeftClickForGrab = true; // 👈 set true for mouse grabbing
     [SerializeField] private KeyCode grabKey = KeyCode.E;     // fallback if you turn mouse off
     [SerializeField] private KeyCode punchKey = KeyCode.F;
     [SerializeField] private KeyCode throwKey = KeyCode.Q;
@@ -136,7 +143,7 @@ public class PhysicsObj : MonoBehaviour
     [SerializeField] private AudioClip detectionSound;
 
     [Header("Visual Feedback")]
-    [SerializeField] private Material highlightMaterial;
+    [SerializeField] private Material highlightMaterial; // fallback if no Highlightable
     [SerializeField] private GameObject punchEffect;
     [SerializeField] private LineRenderer dragLineRenderer;
 
@@ -159,6 +166,8 @@ public class PhysicsObj : MonoBehaviour
     private Rigidbody grabbedRigidbody;
     private Material originalMaterial;
     private Renderer physicsObjRenderer;
+
+    private Highlightable currentHighlightable;
 
     private RaycastHit primaryHit;
     private bool hasValidPhysicsObj;
@@ -208,14 +217,6 @@ public class PhysicsObj : MonoBehaviour
         if (playerCamera == null)
             playerCamera = Camera.main;
 
-        if (grabPoint == null && playerCamera != null)
-        {
-            GameObject grabPointObj = new GameObject("GrabPoint");
-            grabPointObj.transform.SetParent(playerCamera.transform);
-            grabPointObj.transform.localPosition = Vector3.forward * grabDistance;
-            grabPoint = grabPointObj.transform;
-        }
-
         return isValid;
     }
 
@@ -255,10 +256,28 @@ public class PhysicsObj : MonoBehaviour
         wasGroundedLastFrame = playerMovement.Grounded;
     }
 
+    // Helper: aim ray goes through your crosshair
+    private Ray GetAimRay()
+    {
+        if (playerCamera != null)
+        {
+            return playerCamera.ViewportPointToRay(
+                new Vector3(0.5f + aimViewportOffset.x, 0.5f + aimViewportOffset.y, 0f)
+            );
+        }
+
+        // fallback if camera missing
+        Vector3 origin = (orientation != null ? orientation.position : transform.position) + Vector3.up * detectionHeightOffset;
+        Vector3 dir = orientation != null ? orientation.forward : transform.forward;
+        return new Ray(origin, dir);
+    }
+
     private void PerformSmartDetection()
     {
-        Vector3 detectionOrigin = GetDetectionOrigin();
-        Vector3 detectionDirection = orientation.forward;
+        // ✅ FIX: acquisition cast uses crosshair ray, not assumed camera.forward
+        Ray aimRay = GetAimRay();
+        Vector3 detectionOrigin = aimRay.origin + aimRay.direction * 0.1f; // tiny push forward
+        Vector3 detectionDirection = aimRay.direction;
 
         bool primaryDetection = Physics.SphereCast(
             detectionOrigin,
@@ -297,12 +316,6 @@ public class PhysicsObj : MonoBehaviour
         {
             ResetDetectionState();
         }
-    }
-
-    private Vector3 GetDetectionOrigin()
-    {
-        Vector3 basePosition = orientation != null ? orientation.position : transform.position;
-        return basePosition + Vector3.up * detectionHeightOffset;
     }
 
     private bool ValidateDetectedObject(RaycastHit hit)
@@ -440,18 +453,29 @@ public class PhysicsObj : MonoBehaviour
         }
     }
 
+    // ROBUST GRAB POINT (camera-based, Cinemachine safe)
+    private Vector3 GetGrabWorldPos()
+    {
+        Transform cam = playerCamera.transform;
+        return cam.position
+             + cam.forward * grabDistance
+             + cam.up * 0.2f
+             + cam.right * 0.15f;
+    }
+
     private void UpdateGrabbing()
     {
         if (CurrentState == InteractionState.Dragging && grabbedRigidbody != null)
         {
-            Vector3 targetPosition = grabPoint.position;
+            Vector3 targetPosition = GetGrabWorldPos();
             Vector3 direction = targetPosition - grabbedRigidbody.position;
+
             grabbedRigidbody.linearVelocity = direction * grabForce;
 
             if (dragLineRenderer != null)
             {
                 dragLineRenderer.enabled = true;
-                dragLineRenderer.SetPosition(0, grabPoint.position);
+                dragLineRenderer.SetPosition(0, targetPosition);
                 dragLineRenderer.SetPosition(1, grabbedRigidbody.transform.position);
             }
         }
@@ -534,11 +558,29 @@ public class PhysicsObj : MonoBehaviour
 
     private void UpdateHighlight()
     {
+        // turn off old highlight
+        if (currentHighlightable != null)
+            currentHighlightable.SetHighlight(false);
+
         if (physicsObjRenderer != null && originalMaterial != null)
             physicsObjRenderer.material = originalMaterial;
 
+        currentHighlightable = null;
+        physicsObjRenderer = null;
+        originalMaterial = null;
+
+        // apply new highlight
         if (currentPhysicsObj != null)
         {
+            // preferred: Highlightable component
+            currentHighlightable = currentPhysicsObj.GetComponent<Highlightable>();
+            if (currentHighlightable != null)
+            {
+                currentHighlightable.SetHighlight(true);
+                return;
+            }
+
+            // fallback: material swap if no Highlightable exists
             physicsObjRenderer = currentPhysicsObj.GetComponent<Renderer>();
             if (physicsObjRenderer != null && highlightMaterial != null)
             {
@@ -550,11 +592,20 @@ public class PhysicsObj : MonoBehaviour
 
     private void UpdateVisualFeedback()
     {
-        if (CurrentState != InteractionState.Detected && physicsObjRenderer != null && originalMaterial != null)
+        if (CurrentState != InteractionState.Detected)
         {
-            physicsObjRenderer.material = originalMaterial;
-            physicsObjRenderer = null;
-            originalMaterial = null;
+            if (currentHighlightable != null)
+            {
+                currentHighlightable.SetHighlight(false);
+                currentHighlightable = null;
+            }
+
+            if (physicsObjRenderer != null && originalMaterial != null)
+            {
+                physicsObjRenderer.material = originalMaterial;
+                physicsObjRenderer = null;
+                originalMaterial = null;
+            }
         }
     }
 
@@ -589,10 +640,11 @@ public class PhysicsObj : MonoBehaviour
 
     private void UpdateDebugVisualization()
     {
-        if (!showDebugRays || orientation == null) return;
+        if (!showDebugRays) return;
 
-        Vector3 origin = GetDetectionOrigin();
-        Vector3 direction = orientation.forward * detectionDistance;
+        Ray aimRay = GetAimRay();
+        Vector3 origin = aimRay.origin + aimRay.direction * 0.1f;
+        Vector3 direction = aimRay.direction * detectionDistance;
 
         Color rayColor = CurrentState switch
         {
@@ -616,10 +668,11 @@ public class PhysicsObj : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        if (!showDebugGizmos || orientation == null) return;
+        if (!showDebugGizmos) return;
 
-        Vector3 origin = GetDetectionOrigin();
-        Vector3 endPoint = origin + orientation.forward * detectionDistance;
+        Ray aimRay = GetAimRay();
+        Vector3 origin = aimRay.origin + aimRay.direction * 0.1f;
+        Vector3 endPoint = origin + aimRay.direction * detectionDistance;
 
         Gizmos.color = hasValidPhysicsObj ? Color.green : Color.red;
         Gizmos.DrawWireSphere(origin, detectionRadius);

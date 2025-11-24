@@ -1,77 +1,51 @@
 using UnityEngine;
 using UnityEngine.Events;
 
-
-// Interaction.cs  (aka: the NON-physics interaction gremlin)
-
+//
+// InteractionSelector.cs  (aka: the NON-physics interaction gremlin)
+//
 // This script is basically the "selector brain":
-// - It looks at stuff Yeah TufF!
+// - It looks at stuff
 // - Figures out what you're aiming at
 // - Lets you press E to do *non-physics* interactions
 //
 // PhysicsObj.cs stays CLEAN and ONLY handles:
 //   grab / drag / punch / throw / climb triggers
-
+//
 // InteractionSelector.cs handles:
 //   buttons, doors, animation triggers, NPC talk, UI, etc.
 //   (things that don't need Rigidbody yeeting)
-
-// They work together like:
-//   Selector: "hey you're looking at a door"
-//   Door: "press E to open me"
-//   PhysicsObj: "cool, not my job, I'll nap"
-
+//
 // IMPORTANT LAYERS!!!!!!!!!!!!
 // Make a layer for NON-physics interactables
 // Example:
 //   -Interactable-  Interactable   (doors/buttons/etc.)
 //   -Interactable-  PhysicsObj     (rigidbody stuff)
-
+//
 // Then:
 //   PhysicsObj.cs    uses PhysicsObj layer
 //   Selector.cs      uses Interactable layer
-
-// if you break it:
-// 1. check the layer masks
-// 2. check colliders exist
-// 3. check your interactable has a script that implements IInteractable
-// 4. accept that you've angered the unity gods
-
-// Test Objects you should make right NOW you foolish mortal peasant:
-// 1) Door / Button / Lever prefab
-//    - Add Collider
-//    - Set Layer to "Interactable"
-//    - Add a script implementing IInteractable (example later)
-
+//
 // Default Controls:
 // E - Interact with NON-physics interactables
-
+//
 // Extra spicy option:
 // If disablePhysicsWhileHovering = true
 // then when you look at a button/door etc,
 // PhysicsObj.cs turns OFF so it doesn't steal your E key.
-// (no more grabbing a cube when you wanted to open a door)
-
+//
 // verifications in editor or else sadness:
 // - playerCamera assigned (auto Main Camera if missing)
 // - interactableLayer set to your NON-physics layer
 // - PhysicsObj script reference optionally assigned
 // - objects have colliders + right layer
+// - objects have IInteractable script
+//
 
-
-/// <summary>
-/// Anything you want THIS selector to talk to must implement IInteractable.
-/// (not physics objects — those go to PhysicsObj.cs)
-/// </summary>
 public interface IInteractable
 {
-    // optional UI prompt like "Press E to Open"
     string GetPrompt();
-
-    // return false if locked/cooldown/etc.
     bool CanInteract(Interaction selector);
-
-    // do the thing (open door, play anim, push button, etc.)
     void Interact(Interaction selector);
 }
 
@@ -79,11 +53,10 @@ public class Interaction : MonoBehaviour
 {
     [Header("Core References")]
     [SerializeField] private Camera playerCamera;
-    [SerializeField] private PhysicsObj physicsObjInteractor; 
-    // ties into Script A so we can politely tell it to shut up when needed
+    [SerializeField] private PhysicsObj physicsObjInteractor;
 
     [Header("Detection Settings (Non-Physics)")]
-    [SerializeField] private LayerMask interactableLayer = -1; 
+    [SerializeField] private LayerMask interactableLayer = -1;
     [SerializeField] [Range(0.5f, 6f)] private float detectionDistance = 3f;
     [SerializeField] [Range(0.05f, 0.8f)] private float detectionRadius = 0.25f;
 
@@ -104,6 +77,7 @@ public class Interaction : MonoBehaviour
 
     private IInteractable currentInteractable;
     private Transform currentTransform;
+    private Highlightable currentHighlightable;
     private RaycastHit hit;
 
     private float stabilityTimer;
@@ -113,11 +87,9 @@ public class Interaction : MonoBehaviour
 
     private void Start()
     {
-        // if you forgot the camera I will save you (begrudgingly)
         if (playerCamera == null)
             playerCamera = Camera.main;
 
-        // if you forgot to plug PhysicsObj, also fine
         if (physicsObjInteractor == null)
             physicsObjInteractor = GetComponent<PhysicsObj>();
     }
@@ -151,7 +123,6 @@ public class Interaction : MonoBehaviour
             return;
         }
 
-        // new target? reset the brain
         if (hit.transform != currentTransform)
         {
             ClearCurrent();
@@ -170,6 +141,11 @@ public class Interaction : MonoBehaviour
             if (!hasStableTarget && stabilityTimer >= KStabilityTime)
             {
                 hasStableTarget = true;
+
+                currentHighlightable = currentTransform.GetComponent<Highlightable>();
+                if (currentHighlightable != null)
+                    currentHighlightable.SetHighlight(true);
+
                 OnHoverEnter?.Invoke(currentTransform.gameObject);
             }
         }
@@ -190,13 +166,17 @@ public class Interaction : MonoBehaviour
     {
         if (!disablePhysicsWhileHovering || physicsObjInteractor == null) return;
 
-        // if we are hovering a NON-physics interactable
-        // we disable PhysicsObj.cs so it doesn't hog the E key.
         physicsObjInteractor.enabled = !(hasStableTarget && currentInteractable != null);
     }
 
     private void ClearCurrent()
     {
+        if (currentHighlightable != null)
+        {
+            currentHighlightable.SetHighlight(false);
+            currentHighlightable = null;
+        }
+
         if (currentTransform != null && hasStableTarget)
             OnHoverExit?.Invoke(currentTransform.gameObject);
 

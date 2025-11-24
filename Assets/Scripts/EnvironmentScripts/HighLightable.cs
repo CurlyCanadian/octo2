@@ -5,8 +5,6 @@ using UnityEngine;
 // slap this on anything that wants to glow when hovered
 //
 // no custom shaders, just uses emission on whatever material it already has
-// if emission isn't enabled on your material, script will try anyway
-// (URP Lit / Standard both support emission)
 //
 
 [DisallowMultipleComponent]
