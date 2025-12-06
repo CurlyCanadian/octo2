@@ -115,7 +115,8 @@ public class PhysicsObj : MonoBehaviour
     [SerializeField] [Range(1f, 20f)] private float grabForce = 10f;
     [SerializeField] [Range(0.1f, 2f)] private float grabDamping = 0.5f;
     [SerializeField] [Range(1f, 10f)] private float throwForce = 5f;
-    [SerializeField] [Range(0.1f, 5f)] private float maxGrabMass = 2f;
+    [SerializeField] [Range(0.1f, 5f)] private float maxGrabMass = 2f; // max mass we can fully lift
+    [SerializeField] [Range(0.1f, 20f)] private float maxDragMass = 8f; // max mass we can still drag
 
     [Header("Punch Settings")]
     [SerializeField] [Range(5f, 50f)] private float punchForce = 20f;
@@ -174,8 +175,19 @@ public class PhysicsObj : MonoBehaviour
     private bool hasStableDetection;
     private bool isPunching;
 
+    // Mass / drag mode
+    private bool isHeavyDrag;           // true = drag-only mode (too heavy to lift)
+    private float dragPlaneY;           // y height to keep heavy objects at while dragging
+
     private const float KMaxDistanceFromHitPoint = 3f;
     private const float KDetectionStabilityTime = 0.1f;
+
+    private void OnValidate()
+    {
+        // Ensure drag threshold is never lower than grab (lift) threshold
+        if (maxDragMass < maxGrabMass)
+            maxDragMass = maxGrabMass;
+    }
 
     private void Start()
     {
@@ -425,30 +437,51 @@ public class PhysicsObj : MonoBehaviour
     {
         if (!CanGrabObject()) return;
 
+        Rigidbody rb = currentPhysicsObj.GetComponent<Rigidbody>();
+        if (rb == null) return;
+
+        float mass = rb.mass;
+
+        // Decide whether this becomes a full lift or a drag-only interaction
+        isHeavyDrag = mass > maxGrabMass;
+        dragPlaneY = rb.position.y;
+
+        grabbedRigidbody = rb;
         CurrentState = InteractionState.Grabbing;
         LastInteractionType = InteractionType.Grab;
 
-        grabbedRigidbody = currentPhysicsObj.GetComponent<Rigidbody>();
-        if (grabbedRigidbody != null)
-        {
-            CreateGrabJoint();
-            PlaySound(grabSound);
-        }
+        CreateGrabJoint();
+        PlaySound(grabSound);
     }
 
     private bool CanGrabObject()
     {
+        if (currentPhysicsObj == null) return false;
+
         Rigidbody rb = currentPhysicsObj.GetComponent<Rigidbody>();
-        return rb != null &&
-               rb.mass <= maxGrabMass &&
-               Vector3.Distance(transform.position, currentPhysicsObj.position) <= grabDistance;
+        if (rb == null) return false;
+
+        // Hard limit: too heavy to move at all
+        if (rb.mass > maxDragMass)
+        {
+            Debug.Log($"{currentPhysicsObj.name} is too heavy to move (mass {rb.mass}).");
+            return false;
+        }
+
+        // Distance check
+        if (Vector3.Distance(transform.position, currentPhysicsObj.position) > grabDistance)
+            return false;
+
+        return true;
     }
 
     private void CreateGrabJoint()
     {
         if (grabbedRigidbody != null)
         {
-            grabbedRigidbody.useGravity = false;
+            // Light objects: fully lifted (no gravity).
+            // Heavy objects (drag-only): keep gravity so they stay grounded.
+            grabbedRigidbody.useGravity = !isHeavyDrag;
             grabbedRigidbody.linearDamping = grabDamping * 5f;
         }
     }
@@ -468,6 +501,13 @@ public class PhysicsObj : MonoBehaviour
         if (CurrentState == InteractionState.Dragging && grabbedRigidbody != null)
         {
             Vector3 targetPosition = GetGrabWorldPos();
+
+            if (isHeavyDrag)
+            {
+                // Heavy objects: drag along a horizontal plane instead of lifting
+                targetPosition.y = dragPlaneY;
+            }
+
             Vector3 direction = targetPosition - grabbedRigidbody.position;
 
             grabbedRigidbody.linearVelocity = direction * grabForce;
@@ -503,6 +543,7 @@ public class PhysicsObj : MonoBehaviour
         }
 
         grabbedRigidbody = null;
+        isHeavyDrag = false;
 
         if (dragLineRenderer != null)
             dragLineRenderer.enabled = false;
